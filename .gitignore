@@ -14,15 +14,9 @@ build/
 *.jpg
 *.jpeg
 *.png
-!811W2.jpg  # Keep sample image
-!result.jpg
 
 # ONNX models
 *.onnx
-!weights/best.onnx  # Keep model
-
-# PyTorch
-*.pt
 
 # IDE
 .vscode/
