@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Images (large)
+*.jpg
+*.jpeg
+*.png
+!811W2.jpg  # Keep sample image
+!result.jpg
+
+# ONNX models
+*.onnx
+!weights/best.onnx  # Keep model
+
+# PyTorch
+*.pt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
