@@ -8,13 +8,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # CUDA
 find_package(CUDA REQUIRED)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -O3 --expt-relaxed-constexpr)
+include_directories(${CUDA_INCLUDE_DIRS})
 
 # TensorRT (可选)
-find_package(TensorRT QUIET)
-if(TensorRT_FOUND)
-    message(STATUS "TensorRT found: ${TensorRT_VERSION}")
-    include_directories(${TensorRT_INCLUDE_DIRS})
-    link_directories(${TensorRT_LIBRARY_DIRS})
+# 使用 -DTENSORRT_ROOT=/path/to/TensorRT 指定路径
+set(TENSORRT_ROOT "/usr/local/TensorRT" CACHE PATH "TensorRT root directory")
+if(EXISTS ${TENSORRT_ROOT})
+    message(STATUS "TensorRT root: ${TENSORRT_ROOT}")
+    set(TensorRT_FOUND ON)
+    include_directories(
+        ${TENSORRT_ROOT}/include
+        ${TENSORRT_ROOT}/include/x86_64-linux-gnu
+    )
+    link_directories(${TENSORRT_ROOT}/lib)
 endif()
 
 # OpenCV
@@ -46,10 +52,17 @@ target_link_libraries(yolo_server
     grpc++
     ${OpenCV_LIBS}
     ${CUDA_LIBRARIES}
+    cudart
 )
 
+# TensorRT 链接
 if(TensorRT_FOUND)
-    target_link_libraries(yolo_server ${TensorRT_LIBRARIES})
+    message(STATUS "Linking TensorRT libraries")
+    target_link_libraries(yolo_server
+        nvinfer
+        nvonnxparser
+        nvparsers
+    )
     target_compile_definitions(yolo_server USE_TENSORRT)
 endif()
 

@@ -239,12 +239,56 @@ context = engine.create_execution_context()
 
 ---
 
-## 下一步
+## 在 Orin NX 上部署
 
-1. 确认 Orin NX 环境 (CUDA/TensorRT 版本)
-2. 在 Orin NX 上编译 TensorRT 引擎
-3. 编写 C++ gRPC 服务
-4. 编写 Python 客户端
+### 1. 环境准备
+
+```bash
+# 安装 Python 依赖
+pip install -r src/python/requirements.txt
+```
+
+### 2. 编译 TensorRT 引擎
+
+```bash
+trtexec --onnx=weights/best.onnx \
+        --saveEngine=weights/best.trt \
+        --fp16 \
+        --workspace=2048
+```
+
+### 3. 编译 C++ 服务
+
+```bash
+cd src/cpp
+mkdir build && cd build
+cmake .. -DTENSORRT_ROOT=/usr/local/TensorRT
+make -j4
+```
+
+### 4. 启动服务
+
+```bash
+./yolo_server --engine ../weights/best.trt --port 50051
+```
+
+### 5. 测试
+
+```bash
+# 图片
+python src/python/client.py --server localhost:50051 --input 811W2.jpg
+
+# RTMP 流
+python src/python/client.py --server localhost:50051 --input rtmp://192.168.1.100/live
+```
+
+### 性能调优
+
+| 参数 | 推荐值 |
+|------|--------|
+| --fp16 | 启用 |
+| --workspace | 2048MB |
+| batch | 1 (实时) |
 
 ---
 
