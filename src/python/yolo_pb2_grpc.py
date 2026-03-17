@@ -37,12 +37,17 @@ class YoloInferenceStub(object):
         """
         self.Infer = channel.unary_unary(
                 '/yolo.YoloInference/Infer',
+                request_serializer=yolo__pb2.InferRequest.SerializeToString,
+                response_deserializer=yolo__pb2.DetectionResult.FromString,
+                _registered_method=True)
+        self.InferRaw = channel.unary_unary(
+                '/yolo.YoloInference/InferRaw',
                 request_serializer=yolo__pb2.ImageData.SerializeToString,
                 response_deserializer=yolo__pb2.DetectionResult.FromString,
                 _registered_method=True)
         self.InferStream = channel.stream_stream(
                 '/yolo.YoloInference/InferStream',
-                request_serializer=yolo__pb2.ImageData.SerializeToString,
+                request_serializer=yolo__pb2.InferRequest.SerializeToString,
                 response_deserializer=yolo__pb2.DetectionResult.FromString,
                 _registered_method=True)
         self.Health = channel.unary_unary(
@@ -57,14 +62,21 @@ class YoloInferenceServicer(object):
     """
 
     def Infer(self, request, context):
-        """单帧推理
+        """方案 A: Shared Memory 方式 (推荐)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def InferRaw(self, request, context):
+        """方案 B: 直接传数据 (保留兼容)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def InferStream(self, request_iterator, context):
-        """流式推理 (用于视频流)
+        """流式推理
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -82,12 +94,17 @@ def add_YoloInferenceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Infer': grpc.unary_unary_rpc_method_handler(
                     servicer.Infer,
+                    request_deserializer=yolo__pb2.InferRequest.FromString,
+                    response_serializer=yolo__pb2.DetectionResult.SerializeToString,
+            ),
+            'InferRaw': grpc.unary_unary_rpc_method_handler(
+                    servicer.InferRaw,
                     request_deserializer=yolo__pb2.ImageData.FromString,
                     response_serializer=yolo__pb2.DetectionResult.SerializeToString,
             ),
             'InferStream': grpc.stream_stream_rpc_method_handler(
                     servicer.InferStream,
-                    request_deserializer=yolo__pb2.ImageData.FromString,
+                    request_deserializer=yolo__pb2.InferRequest.FromString,
                     response_serializer=yolo__pb2.DetectionResult.SerializeToString,
             ),
             'Health': grpc.unary_unary_rpc_method_handler(
@@ -122,6 +139,33 @@ class YoloInference(object):
             request,
             target,
             '/yolo.YoloInference/Infer',
+            yolo__pb2.InferRequest.SerializeToString,
+            yolo__pb2.DetectionResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def InferRaw(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/yolo.YoloInference/InferRaw',
             yolo__pb2.ImageData.SerializeToString,
             yolo__pb2.DetectionResult.FromString,
             options,
@@ -149,7 +193,7 @@ class YoloInference(object):
             request_iterator,
             target,
             '/yolo.YoloInference/InferStream',
-            yolo__pb2.ImageData.SerializeToString,
+            yolo__pb2.InferRequest.SerializeToString,
             yolo__pb2.DetectionResult.FromString,
             options,
             channel_credentials,

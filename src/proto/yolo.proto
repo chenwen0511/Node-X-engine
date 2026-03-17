@@ -4,49 +4,59 @@ package yolo;
 
 // YOLO 推理服务
 service YoloInference {
-  // 单帧推理
-  rpc Infer(ImageData) returns (DetectionResult);
+  // 方案 A: Shared Memory 方式 (推荐)
+  rpc Infer(InferRequest) returns (DetectionResult);
   
-  // 流式推理 (用于视频流)
-  rpc InferStream(stream ImageData) returns (stream DetectionResult);
+  // 方案 B: 直接传数据 (保留兼容)
+  rpc InferRaw(ImageData) returns (DetectionResult);
+  
+  // 流式推理
+  rpc InferStream(stream InferRequest) returns (stream DetectionResult);
   
   // 健康检查
   rpc Health(HealthRequest) returns (HealthResponse);
 }
 
-// 图像数据
+// 方案 A: 通过 Shared Memory 传输 (Zero-Copy)
+message InferRequest {
+  string buffer_name = 1;    // 共享内存名称 (如 "yolo_image_buffer")
+  int32 width = 2;           // 图像宽度
+  int32 height = 3;          // 图像高度
+  string format = 4;         // "rgb" or "bgr"
+}
+
+// 直接传输图像数据 (方案 B)
 message ImageData {
-  int32 width = 1;      // 图像宽度
-  int32 height = 2;     // 图像高度
-  bytes data = 3;       // RGB 原始数据 (width * height * 3)
-  string format = 4;    // "rgb" or "bgr"
+  int32 width = 1;
+  int32 height = 2;
+  bytes data = 3;
+  string format = 4;
 }
 
 // 检测结果
 message DetectionResult {
   repeated BoundingBox boxes = 1;
-  float inference_time_ms = 2;  // 推理耗时
+  float inference_time_ms = 2;
 }
 
 // 边界框
 message BoundingBox {
-  float x1 = 1;        // 左上角 x
-  float y1 = 2;        // 左上角 y
-  float x2 = 3;        // 右下角 x
-  float y2 = 4;        // 右下角 y
-  float confidence = 5;  // 置信度
-  int32 class_id = 6;    // 类别 ID
-  string class_name = 7; // 类别名称
+  float x1 = 1;
+  float y1 = 2;
+  float x2 = 3;
+  float y2 = 4;
+  float confidence = 5;
+  int32 class_id = 6;
+  string class_name = 7;
 }
 
-// 健康检查请求
+// 健康检查
 message HealthRequest {
   string service = 1;
 }
 
-// 健康检查响应
 message HealthResponse {
   bool healthy = 1;
   string message = 2;
-  string engine_info = 3;  // 引擎信息
+  string engine_info = 3;
 }

@@ -24,23 +24,25 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nyolo.proto\x12\x04yolo\"H\n\tImageData\x12\r\n\x05width\x18\x01 \x01(\x05\x12\x0e\n\x06height\x18\x02 \x01(\x05\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12\x0e\n\x06\x66ormat\x18\x04 \x01(\t\"N\n\x0f\x44\x65tectionResult\x12 \n\x05\x62oxes\x18\x01 \x03(\x0b\x32\x11.yolo.BoundingBox\x12\x19\n\x11inference_time_ms\x18\x02 \x01(\x02\"w\n\x0b\x42oundingBox\x12\n\n\x02x1\x18\x01 \x01(\x02\x12\n\n\x02y1\x18\x02 \x01(\x02\x12\n\n\x02x2\x18\x03 \x01(\x02\x12\n\n\x02y2\x18\x04 \x01(\x02\x12\x12\n\nconfidence\x18\x05 \x01(\x02\x12\x10\n\x08\x63lass_id\x18\x06 \x01(\x05\x12\x12\n\nclass_name\x18\x07 \x01(\t\" \n\rHealthRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\"G\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x13\n\x0b\x65ngine_info\x18\x03 \x01(\t2\xb0\x01\n\rYoloInference\x12/\n\x05Infer\x12\x0f.yolo.ImageData\x1a\x15.yolo.DetectionResult\x12\x39\n\x0bInferStream\x12\x0f.yolo.ImageData\x1a\x15.yolo.DetectionResult(\x01\x30\x01\x12\x33\n\x06Health\x12\x13.yolo.HealthRequest\x1a\x14.yolo.HealthResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nyolo.proto\x12\x04yolo\"R\n\x0cInferRequest\x12\x13\n\x0b\x62uffer_name\x18\x01 \x01(\t\x12\r\n\x05width\x18\x02 \x01(\x05\x12\x0e\n\x06height\x18\x03 \x01(\x05\x12\x0e\n\x06\x66ormat\x18\x04 \x01(\t\"H\n\tImageData\x12\r\n\x05width\x18\x01 \x01(\x05\x12\x0e\n\x06height\x18\x02 \x01(\x05\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12\x0e\n\x06\x66ormat\x18\x04 \x01(\t\"N\n\x0f\x44\x65tectionResult\x12 \n\x05\x62oxes\x18\x01 \x03(\x0b\x32\x11.yolo.BoundingBox\x12\x19\n\x11inference_time_ms\x18\x02 \x01(\x02\"w\n\x0b\x42oundingBox\x12\n\n\x02x1\x18\x01 \x01(\x02\x12\n\n\x02y1\x18\x02 \x01(\x02\x12\n\n\x02x2\x18\x03 \x01(\x02\x12\n\n\x02y2\x18\x04 \x01(\x02\x12\x12\n\nconfidence\x18\x05 \x01(\x02\x12\x10\n\x08\x63lass_id\x18\x06 \x01(\x05\x12\x12\n\nclass_name\x18\x07 \x01(\t\" \n\rHealthRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\"G\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x13\n\x0b\x65ngine_info\x18\x03 \x01(\t2\xea\x01\n\rYoloInference\x12\x32\n\x05Infer\x12\x12.yolo.InferRequest\x1a\x15.yolo.DetectionResult\x12\x32\n\x08InferRaw\x12\x0f.yolo.ImageData\x1a\x15.yolo.DetectionResult\x12<\n\x0bInferStream\x12\x12.yolo.InferRequest\x1a\x15.yolo.DetectionResult(\x01\x30\x01\x12\x33\n\x06Health\x12\x13.yolo.HealthRequest\x1a\x14.yolo.HealthResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'yolo_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_IMAGEDATA']._serialized_start=20
-  _globals['_IMAGEDATA']._serialized_end=92
-  _globals['_DETECTIONRESULT']._serialized_start=94
-  _globals['_DETECTIONRESULT']._serialized_end=172
-  _globals['_BOUNDINGBOX']._serialized_start=174
-  _globals['_BOUNDINGBOX']._serialized_end=293
-  _globals['_HEALTHREQUEST']._serialized_start=295
-  _globals['_HEALTHREQUEST']._serialized_end=327
-  _globals['_HEALTHRESPONSE']._serialized_start=329
-  _globals['_HEALTHRESPONSE']._serialized_end=400
-  _globals['_YOLOINFERENCE']._serialized_start=403
-  _globals['_YOLOINFERENCE']._serialized_end=579
+  _globals['_INFERREQUEST']._serialized_start=20
+  _globals['_INFERREQUEST']._serialized_end=102
+  _globals['_IMAGEDATA']._serialized_start=104
+  _globals['_IMAGEDATA']._serialized_end=176
+  _globals['_DETECTIONRESULT']._serialized_start=178
+  _globals['_DETECTIONRESULT']._serialized_end=256
+  _globals['_BOUNDINGBOX']._serialized_start=258
+  _globals['_BOUNDINGBOX']._serialized_end=377
+  _globals['_HEALTHREQUEST']._serialized_start=379
+  _globals['_HEALTHREQUEST']._serialized_end=411
+  _globals['_HEALTHRESPONSE']._serialized_start=413
+  _globals['_HEALTHRESPONSE']._serialized_end=484
+  _globals['_YOLOINFERENCE']._serialized_start=487
+  _globals['_YOLOINFERENCE']._serialized_end=721
 # @@protoc_insertion_point(module_scope)
