@@ -30,6 +30,7 @@
 #include <grpcpp/grpcpp.h>
 #include <opencv2/opencv.hpp>
 #include <cuda_runtime.h>
+#include <NvInfer.h>
 
 #include "yolo.grpc.pb.h"
 
@@ -44,6 +45,28 @@ using yolo::DetectionResult;
 using yolo::BoundingBox;
 using yolo::HealthRequest;
 using yolo::HealthResponse;
+using namespace nvinfer1;
+
+namespace {
+class TrtLogger final : public ILogger {
+public:
+    void log(Severity severity, const char* msg) noexcept override {
+        if (severity <= Severity::kWARNING) {
+            std::cout << "[TRT] " << msg << std::endl;
+        }
+    }
+};
+
+TrtLogger gTrtLogger;
+
+template <typename T>
+void trtDestroy(T*& p) {
+    if (p) {
+        p->destroy();
+        p = nullptr;
+    }
+}
+}  // namespace
 
 // ============== 配置 ==============
 struct Config {
@@ -72,9 +95,7 @@ class SharedMemoryReader {
 public:
     SharedMemoryReader() : shm_fd(-1), shm_addr(nullptr), size(0) {}
     
-    ~close() {
-        close();
-    }
+    ~SharedMemoryReader() { close(); }
     
     bool open(const std::string& buffer_name, size_t expected_size = 0) {
         close();
@@ -178,6 +199,13 @@ private:
     size_t input_size_ = 0;
     size_t output_size_ = 0;
     cudaStream_t stream_ = nullptr;
+
+    IRuntime* runtime_ = nullptr;
+    ICudaEngine* engine_ = nullptr;
+    IExecutionContext* context_ = nullptr;
+    int input_binding_idx_ = -1;
+    int output_binding_idx_ = -1;
+    std::vector<float> h_output_;
 };
 
 TensorRTEngine::TensorRTEngine(const std::string& engine_path, const Config& config)
@@ -194,6 +222,10 @@ TensorRTEngine::~TensorRTEngine() {
     if (d_input_) cudaFree(d_input_);
     if (d_output_) cudaFree(d_output_);
     if (stream_) cudaStreamDestroy(stream_);
+
+    trtDestroy(context_);
+    trtDestroy(engine_);
+    trtDestroy(runtime_);
 }
 
 bool TensorRTEngine::load() {
@@ -205,11 +237,52 @@ bool TensorRTEngine::load() {
         std::cerr << "[TensorRT] Run: trtexec --onnx=best.onnx --saveEngine=best.trt --fp16" << std::endl;
         return false;
     }
+
+    file.seekg(0, file.end);
+    size_t size = static_cast<size_t>(file.tellg());
+    file.seekg(0, file.beg);
+    std::vector<char> trtModelStream(size);
+    file.read(trtModelStream.data(), size);
+    file.close();
+
+    runtime_ = createInferRuntime(gTrtLogger);
+    if (!runtime_) {
+        std::cerr << "[TensorRT] createInferRuntime failed" << std::endl;
+        return false;
+    }
+
+    engine_ = runtime_->deserializeCudaEngine(trtModelStream.data(), size);
+    if (!engine_) {
+        std::cerr << "[TensorRT] deserializeCudaEngine failed" << std::endl;
+        return false;
+    }
+
+    context_ = engine_->createExecutionContext();
+    if (!context_) {
+        std::cerr << "[TensorRT] createExecutionContext failed" << std::endl;
+        return false;
+    }
+
+    input_binding_idx_ = -1;
+    output_binding_idx_ = -1;
+    for (int i = 0; i < engine_->getNbBindings(); ++i) {
+        if (engine_->bindingIsInput(i)) {
+            if (input_binding_idx_ < 0) input_binding_idx_ = i;
+        } else {
+            if (output_binding_idx_ < 0) output_binding_idx_ = i;
+        }
+    }
+    if (input_binding_idx_ < 0 || output_binding_idx_ < 0) {
+        std::cerr << "[TensorRT] Failed to locate input/output bindings" << std::endl;
+        return false;
+    }
     
     // 分配 GPU 内存
     CUDA_CHECK(cudaMalloc(&d_input_, input_size_));
     CUDA_CHECK(cudaMalloc(&d_output_, output_size_));
     CUDA_CHECK(cudaStreamCreate(&stream_));
+
+    h_output_.resize(output_size_ / sizeof(float));
     
     std::cout << "[TensorRT] Engine loaded, Input: " << input_size_ 
               << " bytes, Output: " << output_size_ << " bytes" << std::endl;
@@ -221,27 +294,54 @@ bool TensorRTEngine::infer(const uint8_t* input_data, int width, int height,
                            std::vector<BoundingBox>& boxes, float& time_ms) {
     auto start = std::chrono::high_resolution_clock::now();
     
-    // 1. 预处理: 转换为 float 并归一化 (简化版)
-    std::vector<float> input_float(width * height * 3);
-    for (size_t i = 0; i < input_float.size(); i++) {
-        input_float[i] = static_cast<float>(input_data[i]) / 255.0f;
+    if (!context_ || !engine_ || !d_input_ || !d_output_ || !stream_) {
+        std::cerr << "[TensorRT] Engine not initialized" << std::endl;
+        return false;
     }
-    
-    // 2. H2D
-    CUDA_CHECK(cudaMemcpy(d_input_, input_float.data(), input_size_, cudaMemcpyHostToDevice));
-    
-    // 3. TODO: TensorRT 推理
-    // context->executeV2(bindings);
-    
-    // 模拟推理结果 (实际需要 TensorRT)
-    // 这里生成一个示例框
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    
-    // 4. D2H (实际应从 GPU 读取)
-    // CUDA_CHECK(cudaMemcpy(output, d_output_, output_size_, cudaMemcpyDeviceToHost));
-    
-    // 5. 后处理 (NMS) - 简化版
-    // 实际应解析 TensorRT 输出
+
+    // 1) 预处理: HWC(uint8) -> NCHW(float), 并在必要时 resize 到模型输入尺寸
+    cv::Mat src(height, width, CV_8UC3, const_cast<uint8_t*>(input_data));
+    cv::Mat resized;
+    if (width != config_.input_w || height != config_.input_h) {
+        cv::resize(src, resized, cv::Size(config_.input_w, config_.input_h), 0, 0, cv::INTER_LINEAR);
+    } else {
+        resized = src;
+    }
+
+    const int H = config_.input_h;
+    const int W = config_.input_w;
+    std::vector<float> input_float(static_cast<size_t>(3) * H * W);
+    for (int y = 0; y < H; ++y) {
+        const cv::Vec3b* row = resized.ptr<cv::Vec3b>(y);
+        for (int x = 0; x < W; ++x) {
+            const cv::Vec3b& bgr = row[x];
+            const size_t idx = static_cast<size_t>(y) * W + x;
+            input_float[idx] = static_cast<float>(bgr[2]) / 255.0f;              // R
+            input_float[static_cast<size_t>(H) * W + idx] = static_cast<float>(bgr[1]) / 255.0f;  // G
+            input_float[static_cast<size_t>(2) * H * W + idx] = static_cast<float>(bgr[0]) / 255.0f;  // B
+        }
+    }
+
+    // 2) H2D (异步)
+    CUDA_CHECK(cudaMemcpyAsync(d_input_, input_float.data(), input_size_, cudaMemcpyHostToDevice, stream_));
+
+    // 3) TensorRT 推理 (enqueueV2)
+    std::vector<void*> bindings(static_cast<size_t>(engine_->getNbBindings()), nullptr);
+    bindings[static_cast<size_t>(input_binding_idx_)] = d_input_;
+    bindings[static_cast<size_t>(output_binding_idx_)] = d_output_;
+    if (!context_->enqueueV2(bindings.data(), stream_, nullptr)) {
+        std::cerr << "[TensorRT] enqueueV2 failed" << std::endl;
+        return false;
+    }
+
+    // 4) D2H (异步)
+    CUDA_CHECK(cudaMemcpyAsync(h_output_.data(), d_output_, output_size_, cudaMemcpyDeviceToHost, stream_));
+
+    // 5) 同步等待本次推理完成
+    CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+    // 6) 后处理 (NMS) - 仍保持简化版
+    // 实际应解析 h_output_ 得到 boxes
     
     // 模拟结果
     BoundingBox box;
